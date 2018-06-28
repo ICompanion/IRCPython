@@ -1,5 +1,6 @@
-import socket, string, time
+import string, time
 from threading import Thread
+import socket
 
 class IrcConnection:
 
@@ -13,14 +14,13 @@ class IrcConnection:
     def __init__(self, username, channel, server, port):
         self.user = username
         self.server = server
-        self.port = port
+        self.port = int(port)
         self.channel = channel
 
     def connect(self):
         global IRC
         IRC = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         IRC.connect((self.server, self.port))
-        Thread.start_new_thread(self.listener(), ("Thread n°: 1", 2))
 
     def sendCommand(self, cmd, message):
         command = "{} {}\r\n".format(cmd, message)
