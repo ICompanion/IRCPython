@@ -1,26 +1,34 @@
-import string
+# -*- coding: utf-8 -*-
+
 from threading import Thread
 import socket
 from tkinter import *
 import configparser
+import webbrowser
 
-def setConnection( username, channelP, serverP, portP):
+def setConnection( username, channelP, serverP, portP, passwordP):
     global server
     global port
     global user
+    global password
     global channel
 
     user = username
     server = serverP
     port = int(portP)
+    password = passwordP
     channel = channelP
 
 def send_message(msg):
-    message = user + ":" + msg
-    IRC.send(bytes(message, "utf8"))
-    if msg == "{quit}":
-        IRC.close()
-        windowChat.quit()
+    message = msg + "\n"
+    try:
+        IRC.send(bytes(message, "utf8"))
+        if msg == "{quit}":
+            IRC.close()
+            windowChat.quit()
+    except OSError as e:
+        print(e)
+        pass
 
 def join_channel():
     cmd = "JOIN"
@@ -28,9 +36,15 @@ def join_channel():
 def listener():
     while True:
         try:
-            msg = IRC.recv(BUFSIZ).decode("utf8")
+            msg = IRC.recv(1024).decode("ISO-8859-1")
             getMessage(msg)
-        except OSError:
+
+            if msg.find("PING") != -1:
+                pong = "PONG " + msg.split()[1] + "\r"
+                send_message(pong)
+                getMessage(pong)
+        except OSError as e:
+            print(e)
             break
 
 
@@ -42,21 +56,39 @@ def connect():
         IRC.connect((socket.gethostbyname(server), int(port)))
         receive_thread = Thread(target=listener)
         receive_thread.start()
+        send_message('NICK ' + user + '\r\n')
+        send_message('USER ' + user + ' 0 * :' + user + '\r\n')
     except socket.error as e:
 
         print(e)
+
+def close():
+    global messageDisplay
+    global IRC
+    try:
+        IRC.close()
+        messageDisplay.configure(state=NORMAL)
+        messageDisplay.delete(1.0, END)
+        messageDisplay.insert(END, "Déconnecté de " + server)
+        messageDisplay.configure(state=DISABLED)
+    except socket.error as e:
+        messageDisplay.configure(state=NORMAL)
+        messageDisplay.insert(END, e)
+        messageDisplay.configure(state=DISABLED)
+        pass
+
 
 def start():
     global server
     global port
     global user
+    global password
     global channel
     global windowChat
     global messageDisplay
     global messageEntry
-    global BUFSIZ
+    global channelList
 
-    BUFSIZ = 1024
     windowChat = Tk()
 
     windowChat.title("The Big Irski")
@@ -72,10 +104,17 @@ def start():
     menuBar.add_cascade(label='A Propos')
 
     serverMenu.add_command(label='Connecter', command= lambda : serverConnection())
+    serverMenu.add_command(label='Deconnecter', command= lambda : close())
     serverMenu.add_command(label='Favoris', command= lambda : getPrefered())
 
     messageDisplay = Text(windowChat, height=25, width=50)
     messageDisplay.configure(state=DISABLED)
+
+    chanLabel = Label(windowChat, text="Channels")
+    channelList = Listbox(windowChat, activestyle='dotbox', width=25)
+
+    chanLabel.pack(anchor="nw", padx=30, pady=5)
+    channelList.pack(side='left', fill=Y, expand=1, padx=5, pady=(25, 53))
 
     messageEntry = Text(windowChat, height=5, width=75)
 
@@ -90,26 +129,50 @@ def start():
 
 def sendText():
     msg = messageEntry.get("1.0", END)
-    send_message(msg)
-    getMessage(msg)
+    try:
+        send_message(msg)
+    except Exception:
+        pass
+    getMessage(user + ": " + msg)
+    messageEntry.delete(1.0, END)
+
 
 def getMessage(msg):
-    messageDisplay.insert(END, msg)
+    messages = msg.split(" ")
+    try:
+        for word in messages:
+            if word.startswith("http"):
+                messageDisplay.configure(state=NORMAL)
+                messageDisplay.insert(END, word + " ", 'tag_url')
+                messageDisplay.tag_config('tag_url', foreground='blue', underline=1)
+                messageDisplay.tag_bind('tag_url', '<Button-1>', lambda e: webbrowser.open(word))
+                messageDisplay.configure(state=DISABLED)
+            else:
+                messageDisplay.configure(state=NORMAL)
+                messageDisplay.insert(END, word + " ")
+                messageDisplay.configure(state=DISABLED)
+    except:
+        pass
 
-def addPrefered(server, port, username):
+def addPrefered(server, port, username, password):
     config = configparser.ConfigParser()
-    config[server] = {
-                      'Port' : port,
-                      'User' : username
-                     }
-    with open('preferences.ini', 'a') as configFile:
-        config.write(configFile)
+    print(config.has_section(server))
+    if(config.has_section(server) == False):
+        config[server] = {
+                          'Port' : port,
+                          'User' : username,
+                          'Password': password
+                         }
+        with open('preferences.ini', 'a') as configFile:
+            config.write(configFile)
 
 
-def connectToIrc(window, server, port, user):
-    setConnection(user, '#EpiKnet', server, port)
+def connectToIrc(window, server, port, user, password):
+    setConnection(user, '#EpiKnet', server, port, password)
     window.destroy()
     connect()
+    send_message("REGISTER greg ririo2@hotmail.fr")
+
 
 
 def listClicked(window, list):
@@ -122,8 +185,9 @@ def listClicked(window, list):
         server = pref
         port = config[pref]['Port']
         user = config[pref]['User']
+        password = config[pref]['Password']
 
-        connectToIrc(window,server, port, user)
+        connectToIrc(window,server, port, user, password)
 
 
 def deletePrefered(window, list):
@@ -154,9 +218,75 @@ def getPrefered():
         list.insert(END, pref)
 
     button = Button(preferedList, text="Connecter", command=lambda: listClicked(preferedList, list))
+    button3 = Button(preferedList, text="Modifier", command=lambda: updatePrefered(preferedList, list))
     button2 = Button(preferedList, text="Supprimer des favoris", command=lambda: deletePrefered(preferedList, list))
     button.pack(side='left', padx=10, pady=10)
     button2.pack(side='right', pady=10, padx=10)
+    button3.pack(side='bottom', pady=10, padx=10)
+
+
+def changePrefered(server, port, user, password, window):
+
+    config = configparser.ConfigParser()
+    config.read('preferences.ini')
+    config.set(server, 'port', port)
+    config.set(server, 'user', user)
+    config.set(server, 'password', password)
+
+    with open('preferences.ini', 'w') as f:
+        config.write(f)
+
+    window.destroy()
+
+
+def updatePrefered(preferedList, list):
+    connectionWindow = Tk()
+    connectionWindow.geometry("500x200")
+    connectionWindow.resizable(False, False)
+    connectionWindow.title("Server Connection")
+
+    server = ""
+    port = ""
+    user = ""
+    password = ""
+
+    if len(list.curselection()) > 0:
+        config = configparser.ConfigParser()
+        pref = list.get(list.curselection())
+        server = pref
+        config.read('preferences.ini')
+        port = config[pref]['Port']
+        user = config[pref]['User']
+        password = config[pref]['Password']
+
+    serverLabel = Label(connectionWindow, text="Host").grid(row=0)
+    portLabel = Label(connectionWindow, text="Port").grid(row=0, column=5, pady=20)
+    userLabel = Label(connectionWindow, text="User").grid(row=3)
+    passwordLabel = Label(connectionWindow, text="Password").grid(row=3, column=5)
+
+
+    serverStr = Entry(connectionWindow)
+    portStr = Entry(connectionWindow)
+    userStr = Entry(connectionWindow)
+    passwordStr = Entry(connectionWindow, show="*")
+
+    validateButton = Button(connectionWindow, text="Enregistrer", command=lambda : changePrefered(serverStr.get(), portStr.get(), userStr.get(), passwordStr.get(), connectionWindow))
+    cancelButton = Button(connectionWindow, text="Annuler", command= connectionWindow.destroy)
+
+    serverStr.grid(row=0, column=1, padx=30)
+    portStr.grid(row=0, column=6)
+    userStr.grid(row=3, column=1)
+    passwordStr.grid(row=3, column=6)
+
+    validateButton.grid(row=8, column=2)
+    cancelButton.grid(row=8, column=1, pady=40)
+
+    serverStr.insert(0, server)
+    portStr.insert(0, port)
+    userStr.insert(0, user)
+    passwordStr.insert(0, password)
+
+    preferedList.destroy()
 
 
 def serverConnection():
@@ -175,9 +305,9 @@ def serverConnection():
     userstr = Entry(connectionWindow)
     passwordStr = Entry(connectionWindow, show="*")
 
-    validateButton = Button(connectionWindow, text="Connexion", command=lambda : connectToIrc(connectionWindow, serverStr.get(), portStr.get(), userstr.get()))
-    cancelButton = Button(connectionWindow, text="Cancel", command= connectionWindow.destroy)
-    preferedButton = Button(connectionWindow, text="Ajouter aux favoris", command= lambda : addPrefered(serverStr.get(), portStr.get(), userstr.get()))
+    validateButton = Button(connectionWindow, text="Connection", command=lambda : connectToIrc(connectionWindow, serverStr.get(), portStr.get(), userstr.get(), passwordStr.get()))
+    cancelButton = Button(connectionWindow, text="Annuler", command= connectionWindow.destroy)
+    preferedButton = Button(connectionWindow, text="Ajouter aux favoris", command= lambda : addPrefered(serverStr.get(), portStr.get(), userstr.get(), passwordStr.get()))
 
     serverStr.grid(row=0, column=1, padx=30)
     portStr.grid(row=0, column=6)
