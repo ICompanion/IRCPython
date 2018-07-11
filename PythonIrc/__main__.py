@@ -6,23 +6,27 @@ from tkinter import *
 import configparser
 import webbrowser
 
-def setConnection( username, channelP, serverP, portP, passwordP):
+def setConnection( username, serverP, portP, passwordP):
     global server
     global port
     global user
     global password
     global channel
+    global joinedChannel
+    global commands
 
     user = username
     server = serverP
     port = int(portP)
     password = passwordP
-    channel = channelP
+    channel = None
+    joinedChannel = False
+    commands = {"join", "leave", "part"}
 
 def send_message(msg):
     message = msg + "\n"
     try:
-        IRC.send(bytes(message, "utf8"))
+        IRC.send(bytes(message, "ISO-8859-1"))
         if msg == "{quit}":
             IRC.close()
             windowChat.quit()
@@ -30,8 +34,25 @@ def send_message(msg):
         print(e)
         pass
 
-def join_channel():
-    cmd = "JOIN"
+def join_channel(channelEntry):
+    global channel
+
+    if channelEntry.get().startswith("#"):
+        channel = channelEntry.get()
+        msg ="JOIN " + channelEntry.get()
+    else:
+        channel = '#' + channelEntry.get()
+        msg = "JOIN #" + channelEntry.get()
+    try:
+        send_message(msg)
+    except Exception:
+        pass
+
+def leaveChannel(e):
+    global channel
+    if channel is not None:
+        send_message("PART " + channel)
+        channel = None
 
 def listener():
     while True:
@@ -56,8 +77,8 @@ def connect():
         IRC.connect((socket.gethostbyname(server), int(port)))
         receive_thread = Thread(target=listener)
         receive_thread.start()
-        send_message('NICK ' + user + '\r\n')
-        send_message('USER ' + user + ' 0 * :' + user + '\r\n')
+        send_command('NICK ' + user + '\r\n')
+        send_command('USER ' + user + ' 0 * :' + user + '\r\n')
     except socket.error as e:
 
         print(e)
@@ -87,10 +108,9 @@ def start():
     global windowChat
     global messageDisplay
     global messageEntry
-    global channelList
 
     windowChat = Tk()
-
+    windowChat.geometry("800x600")
     windowChat.title("The Big Irski")
     label = Label(windowChat)
 
@@ -108,29 +128,47 @@ def start():
     serverMenu.add_command(label='Favoris', command= lambda : getPrefered())
 
     messageDisplay = Text(windowChat, height=25, width=50)
-    messageDisplay.configure(state=DISABLED)
-
-    chanLabel = Label(windowChat, text="Channels")
-    channelList = Listbox(windowChat, activestyle='dotbox', width=25)
-
-    chanLabel.pack(anchor="nw", padx=30, pady=5)
-    channelList.pack(side='left', fill=Y, expand=1, padx=5, pady=(25, 53))
+    scroll = Scrollbar(messageDisplay)
+    scroll.pack(side=RIGHT, fill=Y)
+    messageDisplay.configure(state=DISABLED, yscrollcommand=scroll.set)
+    scroll.config(command=messageDisplay.yview)
 
     messageEntry = Text(windowChat, height=5, width=75)
+    scroll2 = Scrollbar(messageEntry)
+    scroll2.pack(side=RIGHT, fill=Y)
+    messageEntry.configure(yscrollcommand=scroll2.set)
+    scroll2.config(command=messageEntry.yview)
+    messageEntry.bind('<Return>', sendMessage)
 
-    sendButton = Button(windowChat, text="Envoyer", command = lambda : sendText())
+    sendButton = Button(windowChat, text="Envoyer", command = lambda : sendMessage(""))
+
+    chanLabel = Label(windowChat, text="Rejoindre un salon")
+    chanEntry = Entry(windowChat)
+
+    chanButton = Button(windowChat, text="Ok", command = lambda : join_channel(chanEntry))
+    chanLeaving = Button(windowChat, text="Quitter le salon", command = lambda : leaveChannel(""))
 
     label.pack()
     messageDisplay.pack(padx=10, pady=10,fill=BOTH, expand=1)
     messageEntry.pack(padx=10, pady=10,fill=BOTH, expand=1)
     sendButton.pack(side="bottom", padx=10, pady=10)
+    chanLabel.pack(anchor="w", padx=30, pady=5)
+    chanEntry.pack(anchor="w", padx=28, pady=5)
+    chanLeaving.pack(anchor="w", padx=42, pady=5)
+    chanButton.pack(anchor="w", padx=70, pady=5)
+
     windowChat.mainloop()
 
+def send_command(cmd):
+    try:
+        send_message(cmd)
+    except Exception:
+        pass
 
-def sendText():
+def sendMessage(e):
     msg = messageEntry.get("1.0", END)
     try:
-        send_message(msg)
+        send_message("PRIVMSG " + channel + " " + msg)
     except Exception:
         pass
     getMessage(user + ": " + msg)
@@ -138,6 +176,7 @@ def sendText():
 
 
 def getMessage(msg):
+
     messages = msg.split(" ")
     try:
         for word in messages:
@@ -168,7 +207,7 @@ def addPrefered(server, port, username, password):
 
 
 def connectToIrc(window, server, port, user, password):
-    setConnection(user, '#EpiKnet', server, port, password)
+    setConnection(user, server, port, password)
     window.destroy()
     connect()
     send_message("REGISTER greg ririo2@hotmail.fr")
@@ -262,7 +301,7 @@ def updatePrefered(preferedList, list):
     serverLabel = Label(connectionWindow, text="Host").grid(row=0)
     portLabel = Label(connectionWindow, text="Port").grid(row=0, column=5, pady=20)
     userLabel = Label(connectionWindow, text="User").grid(row=3)
-    passwordLabel = Label(connectionWindow, text="Password").grid(row=3, column=5)
+    passwordLabel = Label(connectionWindow, text="Password")
 
 
     serverStr = Entry(connectionWindow)
