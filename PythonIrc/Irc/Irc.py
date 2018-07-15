@@ -110,7 +110,7 @@ def start():
     global messageEntry
 
     windowChat = Tk()
-    windowChat.geometry("800x600")
+    windowChat.geometry("900x600")
     windowChat.title("The Big Irski")
     label = Label(windowChat)
 
