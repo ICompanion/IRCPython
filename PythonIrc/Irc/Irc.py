@@ -282,7 +282,7 @@ def updatePrefered(preferedList, list):
     connectionWindow = Tk()
     connectionWindow.geometry("500x200")
     connectionWindow.resizable(False, False)
-    connectionWindow.title("Server Connection")
+    connectionWindow.title("Connexion a un serveur")
 
     server = ""
     port = ""
@@ -344,7 +344,7 @@ def serverConnection():
     userstr = Entry(connectionWindow)
     passwordStr = Entry(connectionWindow, show="*")
 
-    validateButton = Button(connectionWindow, text="Connection", command=lambda : connectToIrc(connectionWindow, serverStr.get(), portStr.get(), userstr.get(), passwordStr.get()))
+    validateButton = Button(connectionWindow, text="Connexion", command=lambda : connectToIrc(connectionWindow, serverStr.get(), portStr.get(), userstr.get(), passwordStr.get()))
     cancelButton = Button(connectionWindow, text="Annuler", command= connectionWindow.destroy)
     preferedButton = Button(connectionWindow, text="Ajouter aux favoris", command= lambda : addPrefered(serverStr.get(), portStr.get(), userstr.get(), passwordStr.get()))
 
