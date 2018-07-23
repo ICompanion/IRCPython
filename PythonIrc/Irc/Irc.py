@@ -13,7 +13,6 @@ def setConnection( username, serverP, portP, passwordP):
     global password
     global channel
     global joinedChannel
-    global commands
 
     user = username
     server = serverP
@@ -21,7 +20,7 @@ def setConnection( username, serverP, portP, passwordP):
     password = passwordP
     channel = None
     joinedChannel = False
-    commands = {"join", "leave", "part"}
+
 
 def send_message(msg):
     message = msg + "\n"
@@ -80,7 +79,7 @@ def connect():
         send_command('NICK ' + user + '\r\n')
         send_command('USER ' + user + ' 0 * :' + user + '\r\n')
     except socket.error as e:
-
+        getMessage("Serveur introuvable.")
         print(e)
 
 def close():
@@ -108,7 +107,10 @@ def start():
     global windowChat
     global messageDisplay
     global messageEntry
+    global commands
 
+    commands = {"/JOIN", "/LEAVE", "/PART", "/HELP", "/LIST", "/NICK ", "/NOTICE", "/ME", "/WHOIS", "/ME",
+                "/AWAY", "/IGNORE", "/QUERY"}
     windowChat = Tk()
     windowChat.geometry("900x600")
     windowChat.title("The Big Irski")
@@ -167,8 +169,18 @@ def send_command(cmd):
 
 def sendMessage(e):
     msg = messageEntry.get("1.0", END)
+    word = msg.split(" ")
+    state = False
+    for cmd in commands:
+        if word[0] == cmd or word[0] == cmd.lower():
+            state = True
     try:
-        send_message("PRIVMSG " + channel + " " + msg)
+        if state == True:
+            send_message(msg[1:])
+            print("commande")
+        else:
+            print("message")
+            send_message("PRIVMSG " + channel + " " + msg)
     except Exception:
         pass
     getMessage(user + ": " + msg)
@@ -195,8 +207,10 @@ def getMessage(msg):
 
 def addPrefered(server, port, username, password):
     config = configparser.ConfigParser()
+    config.read('preferences.ini')
+    print(server)
     print(config.has_section(server))
-    if(config.has_section(server) == False):
+    if not config.has_section(server):
         config[server] = {
                           'Port' : port,
                           'User' : username,
@@ -204,14 +218,15 @@ def addPrefered(server, port, username, password):
                          }
         with open('preferences.ini', 'a') as configFile:
             config.write(configFile)
+        getMessage("Serveur ajouté aux farvoris.\n")
+    else:
+        getMessage("Le serveur existe déja dans les favoris.\n")
 
 
 def connectToIrc(window, server, port, user, password):
     setConnection(user, server, port, password)
     window.destroy()
     connect()
-    send_message("REGISTER greg ririo2@hotmail.fr")
-
 
 
 def listClicked(window, list):
@@ -238,6 +253,7 @@ def deletePrefered(window, list):
         config.remove_section(pref)
         with open('preferences.ini', 'w') as f:
             config.write(f)
+        getMessage("Serveur supprimé des favoris.\n")
 
     window.destroy()
     getPrefered()
@@ -274,6 +290,8 @@ def changePrefered(server, port, user, password, window):
 
     with open('preferences.ini', 'w') as f:
         config.write(f)
+
+    getMessage("Serveur modifié dans les farvoris.\n")
 
     window.destroy()
 
