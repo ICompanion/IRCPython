@@ -5,6 +5,7 @@ import socket
 from tkinter import *
 import configparser
 import webbrowser
+import os
 
 def setConnection( username, serverP, portP, passwordP):
     global server
@@ -108,6 +109,8 @@ def start():
     global messageDisplay
     global messageEntry
     global commands
+    global path
+    path = os.path.dirname(sys.executable) + "\\preferences.ini"
 
     commands = {"/JOIN", "/LEAVE", "/PART", "/HELP", "/LIST", "/NICK ", "/NOTICE", "/ME", "/WHOIS", "/ME",
                 "/AWAY", "/IGNORE", "/QUERY"}
@@ -161,6 +164,7 @@ def start():
 
     windowChat.mainloop()
 
+
 def send_command(cmd):
     try:
         send_message(cmd)
@@ -207,7 +211,7 @@ def getMessage(msg):
 
 def addPrefered(server, port, username, password):
     config = configparser.ConfigParser()
-    config.read('preferences.ini')
+    config.read(path)
     print(server)
     print(config.has_section(server))
     if not config.has_section(server):
@@ -216,7 +220,7 @@ def addPrefered(server, port, username, password):
                           'User' : username,
                           'Password': password
                          }
-        with open('preferences.ini', 'a') as configFile:
+        with open(str(path)+'\\preferences.ini', 'a') as configFile:
             config.write(configFile)
         getMessage("Serveur ajouté aux farvoris.\n")
     else:
@@ -234,7 +238,7 @@ def listClicked(window, list):
         config = configparser.ConfigParser()
         pref = list.get(list.curselection())
 
-        config.read('preferences.ini')
+        config.read(path)
 
         server = pref
         port = config[pref]['Port']
@@ -248,10 +252,10 @@ def deletePrefered(window, list):
     if(len(list.curselection()) > 0):
         config = configparser.ConfigParser()
         pref = list.get(list.curselection())
-        config.read('preferences.ini')
+        config.read(path)
 
         config.remove_section(pref)
-        with open('preferences.ini', 'w') as f:
+        with open(path) as f:
             config.write(f)
         getMessage("Serveur supprimé des favoris.\n")
 
@@ -283,12 +287,12 @@ def getPrefered():
 def changePrefered(server, port, user, password, window):
 
     config = configparser.ConfigParser()
-    config.read('preferences.ini')
+    config.read(path)
     config.set(server, 'port', port)
     config.set(server, 'user', user)
     config.set(server, 'password', password)
 
-    with open('preferences.ini', 'w') as f:
+    with open(path) as f:
         config.write(f)
 
     getMessage("Serveur modifié dans les farvoris.\n")
@@ -311,7 +315,7 @@ def updatePrefered(preferedList, list):
         config = configparser.ConfigParser()
         pref = list.get(list.curselection())
         server = pref
-        config.read('preferences.ini')
+        config.read(path)
         port = config[pref]['Port']
         user = config[pref]['User']
         password = config[pref]['Password']
